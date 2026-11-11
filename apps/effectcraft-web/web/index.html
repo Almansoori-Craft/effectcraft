@@ -56,7 +56,8 @@
       renderFrame: (params) => ec.request("render.frame", { base64: true, ...(params ?? {}) }),
       files: () => ec.files(),
       readFile: (path) => ec.readFile(path),
-      addFile: async (fileOrUrl, name) => {
+      // opts.importAs: "footage" | "composition" | "compositionLayerSizes" for layered files (PSD, PDF, …).
+      addFile: async (fileOrUrl, name, opts) => {
         let bytes;
         if (typeof fileOrUrl === "string") {
           bytes = new Uint8Array(await (await fetch(fileOrUrl)).arrayBuffer());
@@ -65,7 +66,7 @@
           bytes = new Uint8Array(await fileOrUrl.arrayBuffer());
           name = name ?? fileOrUrl.name;
         }
-        return ec.addFile(name, bytes);
+        return ec.addFile(name, bytes, opts?.importAs ?? undefined);
       },
       info: () => ({
         ...ec.info(),

@@ -417,8 +417,18 @@ fn prepare_import(s: &mut Session, p: &Value) -> Result<PendingImport> {
         let mut rest = vec![];
         for path in paths {
             let bytes = match s.services.read_file(&path) {
-                Ok(b) if effectcraft_psd::is_psd(&b) => b,
+                Ok(b) if effectcraft_psd::is_psd(&b) => {
+                    // The layer footage reads these bytes back: hosts whose media layer reads from
+                    // memory (the browser) must have them registered, as `probe` does for footage.
+                    if let Some(i) = &s.importer {
+                        i.register(&path, &b);
+                    }
+                    b
+                }
                 Ok(b) if effectcraft_pdf::sniff(&b).is_some() && !path.to_ascii_lowercase().ends_with(".svg") => {
+                    if let Some(i) = &s.importer {
+                        i.register(&path, &b);
+                    }
                     // PDF / Illustrator / EPS: one layer per file layer.
                     match import_vector_comp(s, &path, &b, page, retain) {
                         Ok((comp, made)) => {

@@ -297,7 +297,15 @@ fn build_layer(proj: &mut Project, cx: &mut Ctx, comp: &Comp, n: &Node) -> Optio
         let mut l = adjustment_layer(proj, comp, &name);
         add_adjustment_effect(proj, &mut l, adj, comp, &mut cx.warnings, &name);
         l
-    } else if let Some(l) = pl.smart_object.as_ref().and_then(|_| smart_object_layer(proj, cx, comp, index, &name)) {
+    } else if let Some(l) = pl
+        .smart_object
+        .as_ref()
+        // A smart object with a raster layer mask: its embedded file would show unmasked (the
+        // mask only reaches a layer's own pixels), so it imports from its rendered pixels below,
+        // the mask baked into their alpha (Al Majlis, 2026-11-12: a cut-out over a title).
+        .filter(|_| !(pl.has_pixels() && pl.mask.is_some_and(|m| !m.disabled)))
+        .and_then(|_| smart_object_layer(proj, cx, comp, index, &name))
+    {
         l
     } else if pl.has_pixels() || pl.fill.is_some() {
         let (item, size) = footage_item(proj, cx, index, &name);

@@ -63,6 +63,12 @@ pub fn repaint() {
 
 /// Open a project or import media from table paths (picked or dropped files).
 pub(crate) fn open_or_import(app: &mut EffectcraftApp, paths: Vec<String>) {
+    open_or_import_as(app, paths, None);
+}
+
+/// [`open_or_import`], importing layered files (Photoshop, PDF, …) as `import_as`
+/// (`file.import`'s `importAs`: footage | composition | compositionLayerSizes) when given.
+pub(crate) fn open_or_import_as(app: &mut EffectcraftApp, paths: Vec<String>, import_as: Option<String>) {
     let (projects, media): (Vec<String>, Vec<String>) = paths.into_iter().partition(|p| p.to_ascii_lowercase().ends_with(".ecproj"));
     if let Some(p) = projects.last()
         && let Err(e) = app.session.execute("file.open", json!({"path": p}))
@@ -70,7 +76,11 @@ pub(crate) fn open_or_import(app: &mut EffectcraftApp, paths: Vec<String>) {
         app.ui.status = e.to_string();
     }
     if !media.is_empty() {
-        match app.session.execute("file.import", json!({"paths": media})) {
+        let mut params = json!({"paths": media});
+        if let Some(a) = import_as {
+            params["importAs"] = json!(a);
+        }
+        match app.session.execute("file.import", params) {
             Ok(r) => {
                 if let Some(errs) = r["errors"].as_array().filter(|e| !e.is_empty()) {
                     app.ui.status = errs.iter().filter_map(|e| e.as_str()).collect::<Vec<_>>().join("; ");

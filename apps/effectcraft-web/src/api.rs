@@ -73,13 +73,14 @@ pub fn read_file(path: String) -> JsValue {
 }
 
 /// Put bytes into the file table under `/<name>` and open (`.ecproj`) or import them. Resolves
-/// with the table path.
+/// with the table path. `import_as` (optional) is `file.import`'s `importAs` for layered files,
+/// e.g. `"composition"` to bring a Photoshop file in as a composition, one layer per layer.
 #[wasm_bindgen(js_name = addFile)]
-pub fn add_file(name: String, data: js_sys::Uint8Array) -> String {
+pub fn add_file(name: String, data: js_sys::Uint8Array, import_as: Option<String>) -> String {
     let path = crate::files::path_for(&name);
     crate::files::put(&path, data.to_vec().into());
     let p = path.clone();
-    crate::post(move |app| crate::open_or_import(app, vec![p]));
+    crate::post(move |app| crate::open_or_import_as(app, vec![p], import_as));
     path
 }
 

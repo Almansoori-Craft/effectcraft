@@ -34,6 +34,40 @@ const EFFECT_ENTRIES: &[&str] = &["box_h", "box_v", "directional", "glow_bright"
 /// can't unroll `classic3d`'s loops, #613) leaves its work to the CPU.
 const EXT_ENTRIES: &[&str] = &["classic3d"];
 
+/// Kernel `entry` of the kernels module, as its `'static` name and whether it binds group 1
+/// (`EXT_ENTRIES`); `None` for a name that is not a kernel. Used to build a kernel on first use.
+fn known_kernel(entry: &str) -> Option<(&'static str, bool)> {
+    if let Some(e) = EXT_ENTRIES.iter().find(|e| **e == entry) {
+        return Some((e, true));
+    }
+    ENTRIES
+        .iter()
+        .chain(crate::adv3d::SKY_KERNELS)
+        .chain(EFFECT_ENTRIES)
+        .chain(crate::fx_color::KERNELS)
+        .chain(crate::fx_distort::KERNELS)
+        .chain(crate::fx_generate::KERNELS)
+        .chain(crate::fx_key::KERNELS)
+        .chain(crate::fx_stylize::KERNELS)
+        .chain(crate::fx_noise::KERNELS)
+        .chain(crate::fx_tone::KERNELS)
+        .chain(crate::fx_warp::KERNELS)
+        .chain(crate::fx_extra::KERNELS)
+        .chain(crate::fx_depth::KERNELS)
+        .chain(crate::fx_lut::KERNELS)
+        .chain(crate::fx_sim::KERNELS)
+        .chain(crate::fx_particles::KERNELS)
+        .chain(crate::fx_vr::KERNELS)
+        .chain(crate::fx_light::KERNELS)
+        .chain(crate::fx_transition::KERNELS)
+        .chain(crate::fx_text::KERNELS)
+        .chain(crate::fx_time::KERNELS)
+        .chain(crate::fx_pixel2::KERNELS)
+        .chain(crate::fx_gen2::KERNELS)
+        .find(|e| **e == entry)
+        .map(|e| (*e, false))
+}
+
 /// Pixel format of every working texture: premultiplied RGBA, 32-bit float (32 bpc headroom;
 /// 8/16 bpc are emulated by clamping and quantising, as on the CPU).
 pub const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba32Float;
@@ -377,6 +411,12 @@ pub struct GpuContext {
     pipelines: HashMap<&'static str, wgpu::ComputePipeline>,
     /// Effect kernels that failed to build, and why (their effects render on the CPU).
     unavailable: Vec<(&'static str, String)>,
+    /// The kernels module and its layouts, to build a kernel on first use (the browser build).
+    kernels_module: wgpu::ShaderModule,
+    kernels_layout: wgpu::PipelineLayout,
+    kernels_layout_ext: wgpu::PipelineLayout,
+    /// Kernels built on first use (the browser build: see `GpuContext::new`).
+    lazy: Mutex<HashMap<&'static str, wgpu::ComputePipeline>>,
     display_bgl: wgpu::BindGroupLayout,
     display: wgpu::ComputePipeline,
     /// The display texture's next mip level from the one above (`display.wgsl` `mip`).
@@ -629,6 +669,14 @@ impl GpuContext {
                 immediate_size: 0,
             })
         })?;
+        // In the browser every kernel is built on first use (`GpuContext::kernel`), not here: building
+        // all ~230 from the one large module kept the browser's single GPU thread busy for minutes
+        // on Windows/NVIDIA until Chrome's watchdog killed the device (Al Majlis, 2026-11-12). The
+        // browser's `init_resource` cannot catch a failed build anyway (its error scopes are async).
+        #[cfg(target_arch = "wasm32")]
+        let (pipelines, unavailable): (HashMap<&'static str, wgpu::ComputePipeline>, Vec<(&'static str, String)>) = (HashMap::new(), Vec::new());
+        #[cfg(not(target_arch = "wasm32"))]
+        let (pipelines, unavailable) = {
         let build = |e: &'static str, layout: &wgpu::PipelineLayout| {
             init_resource(&device, e, || {
                 device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
@@ -690,6 +738,8 @@ impl GpuContext {
                 }
             }
         }
+        (pipelines, unavailable)
+        };
         let dmodule = init_resource(&device, "display shader module", || {
             device.create_shader_module(wgpu::ShaderModuleDescriptor {
                 label: Some("effectcraft display"),
@@ -749,6 +799,10 @@ impl GpuContext {
             bgl_ext,
             pipelines,
             unavailable,
+            kernels_module: module,
+            kernels_layout: layout,
+            kernels_layout_ext: layout_ext,
+            lazy: Default::default(),
             display_bgl,
             display,
             display_mip,
@@ -955,7 +1009,33 @@ impl GpuContext {
 
     /// Whether kernel `entry` was built (an effect or Classic 3D kernel can be missing, #613).
     pub(crate) fn has_kernel(&self, entry: &str) -> bool {
-        self.pipelines.contains_key(entry)
+        self.pipelines.contains_key(entry) || (cfg!(target_arch = "wasm32") && known_kernel(entry).is_some())
+    }
+
+    /// Kernel `entry`'s pipeline: built at start (native), or on its first use (the browser build).
+    pub(crate) fn kernel(&self, entry: &str) -> Option<wgpu::ComputePipeline> {
+        if let Some(p) = self.pipelines.get(entry) {
+            return Some(p.clone());
+        }
+        if !cfg!(target_arch = "wasm32") {
+            return None;
+        }
+        let (name, ext) = known_kernel(entry)?;
+        let mut lazy = self.lazy.lock().ok()?;
+        if let Some(p) = lazy.get(name) {
+            return Some(p.clone());
+        }
+        let layout = if ext { &self.kernels_layout_ext } else { &self.kernels_layout };
+        let p = self.device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: Some(name),
+            layout: Some(layout),
+            module: &self.kernels_module,
+            entry_point: Some(name),
+            compilation_options: Default::default(),
+            cache: None,
+        });
+        lazy.insert(name, p.clone());
+        Some(p)
     }
 
     /// Leave kernel `entry` out, as if it had failed to build (tests of the CPU fallback).
@@ -984,6 +1064,10 @@ impl GpuContext {
             bgl_ext: self.bgl_ext.clone(),
             pipelines,
             unavailable,
+            kernels_module: self.kernels_module.clone(),
+            kernels_layout: self.kernels_layout.clone(),
+            kernels_layout_ext: self.kernels_layout_ext.clone(),
+            lazy: Default::default(),
             display_bgl: self.display_bgl.clone(),
             display: self.display.clone(),
             display_mip: self.display_mip.clone(),
@@ -1295,13 +1379,14 @@ impl<'g> Enc<'g> {
     ) {
         let KernelImages { src, aux, out } = images;
         let g = self.g;
-        let Some(pipe) = g.pipelines.get(entry) else {
+        let Some(pipe) = g.kernel(entry) else {
             if !g.unavailable.iter().any(|(e, _)| *e == entry) {
                 log::error!("gpu: no kernel {entry}");
             }
             self.missing = true;
             return;
         };
+        let pipe = &pipe;
         let ub = g.buffer_init(None, &p.bytes(), wgpu::BufferUsages::UNIFORM);
         let sv = src.texture.create_view(&Default::default());
         let av = aux.map(|a| a.texture.create_view(&Default::default()));
