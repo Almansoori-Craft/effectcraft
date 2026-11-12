@@ -66,7 +66,6 @@ pub use footage::sequence;
 pub use history::{Branch, History, HistoryNode};
 pub use home::demo;
 pub use home::learn;
-pub use home::links;
 pub use home::templates;
 pub use interchange::psd_import;
 pub use interchange::vector;

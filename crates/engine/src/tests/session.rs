@@ -488,25 +488,14 @@ fn save_and_open_roundtrip() {
     let _ = std::fs::remove_dir_all(dir);
 }
 
+/// Al Majlis Effects: the upstream project's Help links (docs, community, website, source code,
+/// feedback, sibling apps) are not commands any more.
 #[test]
-fn help_links_emit_urls() {
+fn upstream_help_links_are_gone() {
     let mut s = Session::default();
-    let r = s.execute("help.discord", json!({})).unwrap();
-    assert_eq!(r["url"], "https://discord.gg/artcraft");
-    assert!(s.drain_events().iter().any(|e| matches!(e, crate::Event::OpenUrl(u) if u.contains("discord"))));
-    assert_eq!(s.execute("help.github", json!({})).unwrap()["url"], "https://github.com/storytold/effectcraft");
-}
-
-/// Every Help ▸ documentation page opens a file that is in the repository (#2696: Expression Reference opened a 404).
-#[test]
-fn help_docs_pages_exist_in_the_repository() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    for page in [None, Some("help"), Some("scripting"), Some("expressions"), Some("effects"), Some("agents")] {
-        let mut s = Session::default();
-        let params = page.map_or_else(|| json!({}), |p| json!({"page": p}));
-        let url = s.execute("help.docs", params).unwrap()["url"].as_str().unwrap().to_owned();
-        let path = url.strip_prefix("https://github.com/storytold/effectcraft/blob/main/").unwrap_or_else(|| panic!("{page:?}: {url}"));
-        assert!(root.join(path).is_file(), "{page:?} opens {url}, which is not in the repository");
+    for id in ["help.docs", "help.discord", "help.website", "help.appPage", "help.github", "help.onlineTutorials", "help.reportIssue", "help.sibling"] {
+        assert!(crate::commands::find(id).is_none(), "{id}");
+        assert!(s.execute(id, json!({})).is_err(), "{id}");
     }
 }
 
