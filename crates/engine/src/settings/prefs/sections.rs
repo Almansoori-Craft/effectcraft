@@ -103,16 +103,16 @@ page!(Previews {
 });
 
 page!(Appearance {
-    /// The single theme before appearance modes (`dark`, `darker` or `light`), kept for older
-    /// settings files and automation: setting it picks its family's mode and theme. While the mode
-    /// is Dark or Light it mirrors the theme in use.
-    theme: String = "dark".into(),
+    /// The single theme before appearance modes (`majlisDark`, `majlisLight`, `dark`, `darker` or
+    /// `light`), kept for older settings files and automation: setting it picks its family's mode
+    /// and theme. While the mode is Dark or Light it mirrors the theme in use.
+    theme: String = "majlisDark".into(),
     /// `auto` (follow the operating system), `dark` or `light`. New installs stay Dark.
     appearance_mode: String = "dark".into(),
-    /// The theme used in dark appearance: `dark` or `darker`.
-    dark_theme: String = "dark".into(),
-    /// The theme used in light appearance: `light`.
-    light_theme: String = "light".into(),
+    /// The theme used in dark appearance: `majlisDark` (new installs), `dark` or `darker`.
+    dark_theme: String = "majlisDark".into(),
+    /// The theme used in light appearance: `majlisLight` (new installs) or `light`.
+    light_theme: String = "majlisLight".into(),
     /// Theme shortcuts in the appearance context menu.
     favorite_themes: Vec<String> = Vec::new(),
     /// User interface brightness, -1 (darker) … 1 (lighter).

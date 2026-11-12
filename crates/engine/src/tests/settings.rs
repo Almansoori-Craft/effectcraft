@@ -129,9 +129,9 @@ fn ui_scale_is_a_percentage_from_75_to_200() {
 #[test]
 fn appearance_defaults_and_legacy_theme_migrate() {
     let p = Prefs::default();
-    assert_eq!((p.appearance.appearance_mode.as_str(), p.appearance.dark_theme.as_str(), p.appearance.light_theme.as_str()), ("dark", "dark", "light"));
-    assert_eq!(p.appearance.resolved_theme(Some(true)), "dark");
-    for (saved, mode, dark, light) in [("darker", "dark", "darker", "light"), ("light", "light", "dark", "light"), ("dark", "dark", "dark", "light")] {
+    assert_eq!((p.appearance.appearance_mode.as_str(), p.appearance.dark_theme.as_str(), p.appearance.light_theme.as_str()), ("dark", "majlisDark", "majlisLight"));
+    assert_eq!(p.appearance.resolved_theme(Some(true)), "majlisDark");
+    for (saved, mode, dark, light) in [("darker", "dark", "darker", "majlisLight"), ("light", "light", "majlisDark", "light"), ("dark", "dark", "dark", "majlisLight")] {
         let p = Prefs::from_json(&json!({"version": 2, "appearance": {"theme": saved}}).to_string());
         assert_eq!(p.appearance.appearance_mode, mode, "{saved}");
         assert_eq!(p.appearance.dark_theme, dark, "{saved}");
@@ -144,7 +144,7 @@ fn appearance_defaults_and_legacy_theme_migrate() {
     let p = Prefs::from_json(r#"{"version": 2, "appearance": {"theme": "dark", "appearanceMode": "auto", "darkTheme": "darker"}}"#);
     assert_eq!((p.appearance.appearance_mode.as_str(), p.appearance.dark_theme.as_str()), ("auto", "darker"));
     let p = Prefs::from_json(r#"{"version": 2, "appearance": {"appearanceMode": "sepia", "darkTheme": "light", "lightTheme": 7}}"#);
-    assert_eq!((p.appearance.appearance_mode.as_str(), p.appearance.dark_theme.as_str(), p.appearance.light_theme.as_str()), ("dark", "dark", "light"));
+    assert_eq!((p.appearance.appearance_mode.as_str(), p.appearance.dark_theme.as_str(), p.appearance.light_theme.as_str()), ("dark", "majlisDark", "majlisLight"));
 }
 
 /// The appearance settings take only their choices, survive a restart, and old clients that set

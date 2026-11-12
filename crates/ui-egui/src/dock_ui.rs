@@ -466,6 +466,10 @@ impl EffectcraftApp {
         };
         let mut output = area.show_content(&mut child, &layout, &style, &mut content);
         let EffectContent { doc_actions, locks, menu, bodies, ime, .. } = content;
+        if t.majlis() {
+            let focused = self.ui.focused;
+            majlis_cards(child.painter(), &t, &bodies, |p| self.ui.dock.is_docked(p), focused);
+        }
         self.dock_rects = bodies;
         self.unpublished_viewports = ime.unpublished();
         // A window that closed or docked takes its composition with it.
@@ -635,7 +639,64 @@ fn dock_style(ui: &egui::Ui, t: &Tokens) -> DockStyle {
     style.inactive_text = t.tab_text;
     style.accent = t.focus;
     style.font = Tokens::ui(12.0);
+    if t.majlis() {
+        // Al Majlis: the tab row sits on the canvas; the host paints a rounded track holding pill
+        // tabs (`majlis_tab_track`), so the library's own tab fills stay clear.
+        style.tab_background = egui::Color32::TRANSPARENT;
+        style.active_background = egui::Color32::TRANSPARENT;
+        style.border = Stroke::new(1.0, t.hairline);
+        style.floating_stroke = Stroke::new(1.0, t.hairline);
+    }
     style
+}
+
+/// Al Majlis: the rounded track behind a group's tabs and the accent pill of its shown tab, from
+/// where the tabs were drawn last frame (the tab row is laid out by craft-ui, which paints no
+/// rounded tabs). `header` is the group header at the end of the strip; `extra` the width of the
+/// Timeline's comp tabs after the panel tabs.
+fn majlis_tab_track(ctx: &egui::Context, painter: &egui::Painter, t: &Tokens, header: Rect, panels: &[PanelKind], active: &PanelKind, extra: f32) {
+    let hits = DockArea::<PanelKind>::hit_rects(ctx, area_id());
+    let same_row = |r: &Rect| (r.center().y - header.center().y).abs() < 1.0 && r.right() <= header.left() + 1.0;
+    let tabs: Vec<(PanelKind, Rect)> = hits
+        .iter()
+        .filter_map(|(hit, rect)| match hit {
+            Hit::Tab(p) if panels.contains(p) && same_row(rect) => Some((*p, *rect)),
+            _ => None,
+        })
+        .collect();
+    let (Some(left), Some(right)) = (tabs.iter().map(|(_, r)| r.left()).reduce(f32::min), tabs.iter().map(|(_, r)| r.right()).reduce(f32::max)) else {
+        return;
+    };
+    let right = (right + extra).min(header.left());
+    let track = Rect::from_min_max(pos2(left, header.top() + 3.0), pos2(right, header.bottom() - 3.0));
+    if !track.is_positive() {
+        return;
+    }
+    let painter = painter.with_clip_rect(Rect::from_min_max(pos2(left, header.top()), pos2(header.left(), header.bottom())));
+    painter.rect(track, track.height() / 2.0, t.field_bg, Stroke::new(1.0, t.hairline), StrokeKind::Inside);
+    if let Some((_, r)) = tabs.iter().find(|(p, _)| p == active) {
+        let pill = Rect::from_min_max(pos2(r.left() + 2.0, track.top() + 2.0), pos2(r.right() - 2.0, track.bottom() - 2.0));
+        painter.rect_filled(pill, pill.height() / 2.0, t.accent);
+    }
+}
+
+/// Al Majlis: docked panel bodies are soft cards: their corners are rounded off into the canvas
+/// and they get a hairline outline (the focused panel an accent one). Painted after the dock, on
+/// the dock's own layer, so floating windows and native windows are not touched.
+fn majlis_cards(painter: &egui::Painter, t: &Tokens, bodies: &[(PanelKind, Rect)], docked: impl Fn(PanelKind) -> bool, focused: PanelKind) {
+    let r = t.radius_card;
+    // A band 2k wide centred k outside the card covers the square corners outside the radius-r
+    // arc once k ≥ r(√2 − 1)/2; clipped to the card, only those corners remain.
+    let k = r * 0.25 + 1.0;
+    for (panel, rect) in bodies {
+        if !docked(*panel) || !rect.is_positive() {
+            continue;
+        }
+        let clipped = painter.with_clip_rect(rect.intersect(painter.clip_rect()));
+        clipped.rect_stroke(rect.expand(k), r + k, Stroke::new(2.0 * k, t.app_bg), StrokeKind::Middle);
+        let outline = if *panel == focused { t.focus } else { t.hairline };
+        clipped.rect_stroke(*rect, r, Stroke::new(1.0, outline), StrokeKind::Inside);
+    }
 }
 
 /// Panels with a viewer lock: the Composition viewers and the Timeline keep their comp while
@@ -830,7 +891,7 @@ impl DockContent<PanelKind> for EffectContent<'_> {
         ui.allocate_rect(rect, Sense::hover());
         // Painted after the body so child backgrounds cannot hide the focus outline.
         if self.app.ui.focused == *panel {
-            ui.painter().rect_stroke(rect, 0.0, Stroke::new(1.0, t.focus), StrokeKind::Inside);
+            ui.painter().rect_stroke(rect, if t.majlis() { t.radius_card } else { 0.0 }, Stroke::new(1.0, t.focus), StrokeKind::Inside);
         }
     }
 
@@ -845,9 +906,16 @@ impl DockContent<PanelKind> for EffectContent<'_> {
     /// The tab names what the panel shows ("Composition Intro"), after the label swatch of its
     /// comp or layer. With comps open, the Timeline's own tab is just "Timeline"; each comp has a
     /// tab of its own after the group's panel tabs.
-    fn label(&mut self, _ui: &egui::Ui, panel: &PanelKind, logical: &str, font: &egui::FontId, color: egui::Color32) -> egui::WidgetText {
+    fn label(&mut self, ui: &egui::Ui, panel: &PanelKind, logical: &str, font: &egui::FontId, color: egui::Color32) -> egui::WidgetText {
         let title = self.titles.iter().find(|(p, _)| p == panel).map_or(logical, |(_, s)| s.as_str());
-        let Some((_, swatch)) = self.swatches.iter().find(|(p, _)| p == panel) else { return title.into() };
+        // Al Majlis: the shown tab's name is white on its accent pill (craft-ui asks for the
+        // active tab's label in the style's text colour; its menus, which ask for the same colour,
+        // are popups and keep it).
+        let tab_row = ui.layer_id().order != egui::Order::Foreground;
+        let color = if self.tokens.majlis() && tab_row && color == self.style.text { self.tokens.on_accent } else { color };
+        let Some((_, swatch)) = self.swatches.iter().find(|(p, _)| p == panel) else {
+            return if self.tokens.majlis() { egui::RichText::new(title).color(color).into() } else { title.into() };
+        };
         let mut job = egui::text::LayoutJob::default();
         job.append("■ ", 0.0, egui::TextFormat::simple(font.clone(), *swatch));
         job.append(title, 0.0, egui::TextFormat::simple(font.clone(), color));
@@ -859,9 +927,15 @@ impl DockContent<PanelKind> for EffectContent<'_> {
     }
 
     /// The viewer lock and the ≡ panel menu of the shown panel.
-    fn group_header(&mut self, ui: &mut egui::Ui, _panels: &[PanelKind], active: &PanelKind, _floating: bool) {
+    fn group_header(&mut self, ui: &mut egui::Ui, panels: &[PanelKind], active: &PanelKind, _floating: bool) {
         let t = self.tokens;
         let header = ui.max_rect();
+        if t.majlis() {
+            // Drawn before the tabs (the header comes first), so the tab names sit on top.
+            let extra = if self.has_doc_tabs(panels) { self.group_extra_tabs_width(panels, active, false) } else { 0.0 };
+            let painter = ui.ctx().layer_painter(ui.layer_id());
+            majlis_tab_track(ui.ctx(), &painter, &t, header, panels, active, extra);
+        }
         let menu = Rect::from_min_max(pos2((header.max.x - MENU_W).max(header.min.x), header.min.y), header.max);
         if has_lock(*active) {
             let lock = Rect::from_center_size(pos2(menu.min.x - LOCK_W / 2.0, header.center().y), vec2(14.0, 14.0));
@@ -894,7 +968,7 @@ impl DockContent<PanelKind> for EffectContent<'_> {
     fn group_extra_tabs(&mut self, ui: &mut egui::Ui, panels: &[PanelKind], active: &PanelKind, _floating: bool) {
         if self.has_doc_tabs(panels) {
             let selected = *active == PanelKind::Timeline;
-            self.doc_actions.extend(dock::doc_tabs(ui, ui.max_rect(), &self.docs, selected, &self.style, &mut self.app.auto));
+            self.doc_actions.extend(dock::doc_tabs(ui, ui.max_rect(), &self.docs, selected, &self.style, &self.tokens, &mut self.app.auto));
         }
     }
 }

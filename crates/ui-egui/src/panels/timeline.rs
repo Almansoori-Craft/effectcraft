@@ -2256,12 +2256,13 @@ fn time_navigator(app: &mut EffectcraftApp, ui: &mut egui::Ui, g: &Tl) {
     let nav = Rect::from_min_max(pos2(graph_x0 + 6.0, top + 6.0), pos2(graph_x1, top + 14.0));
     // Time navigator: the visible span as a grey bar with blue end handles (as in After
     // Effects), over a dark track.
-    p.rect_filled(nav, 1.0, t.field_bg);
+    let nav_r = if t.majlis() { nav.height() / 2.0 } else { 1.0 };
+    p.rect_filled(nav, nav_r, if t.majlis() { t.pressed } else { t.field_bg });
     let vis0 = (tm.start / comp.duration.seconds()) as f32;
     let vis1 = (tm.t(graph_x1) / comp.duration.seconds()) as f32;
     let nav_vis =
         Rect::from_min_max(pos2(nav.min.x + nav.width() * vis0.clamp(0.0, 1.0), nav.min.y), pos2(nav.min.x + nav.width() * vis1.clamp(0.0, 1.0), nav.max.y));
-    p.rect_filled(nav_vis, 0.0, t.tl_nav_bar);
+    p.rect_filled(nav_vis, if t.majlis() { nav_r } else { 0.0 }, t.tl_nav_bar);
     for x in [nav_vis.min.x, nav_vis.max.x] {
         p.rect_filled(Rect::from_min_max(pos2(x - 3.0, nav.min.y - 1.0), pos2(x + 3.0, nav.max.y + 1.0)), 3.0, t.accent);
     }

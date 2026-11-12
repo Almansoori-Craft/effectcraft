@@ -594,10 +594,18 @@ pub fn doc_tabs(
     docs: &[DocTab],
     selected: bool,
     style: &craft_ui::docking::DockStyle,
+    t: &Tokens,
     reg: &mut crate::automation::Registry,
 ) -> Vec<DocAction> {
     let mut out = Vec::new();
     let timeline = PanelKind::Timeline.id();
+    // Al Majlis: the shown comp's tab is an accent pill with white text and ×.
+    let on_pill = t.majlis().then(|| {
+        let mut s = style.clone();
+        s.text = t.on_accent;
+        s.inactive_text = t.on_accent.gamma_multiply(0.8);
+        s
+    });
     let widths = doc_widths(ui.ctx(), docs, &style.font);
     let active = docs.iter().position(|d| d.active).unwrap_or(0);
     let fit = craft_ui::tabs::fit_whole(&widths, active, strip.width(), DOC_OVERFLOW);
@@ -609,7 +617,8 @@ pub fn doc_tabs(
         let tab = Rect::from_min_size(pos2(x, strip.min.y), vec2(*width, strip.height()));
         x += width;
         let on = selected && doc.active;
-        let color = if on { style.text } else { style.inactive_text };
+        let tab_style = if on { on_pill.as_ref().unwrap_or(style) } else { style };
+        let color = if on { tab_style.text } else { style.inactive_text };
         let mut job = doc_job(doc, &style.font, color);
         job.wrap = egui::text::TextWrapping {
             max_width: (tab.width() - TAB_PADDING - DOC_CLOSE).max(0.0),
@@ -624,7 +633,13 @@ pub fn doc_tabs(
             tab,
             |ui, response| {
                 let painter = ui.painter().with_clip_rect(tab.intersect(clip));
-                painter.rect_filled(tab, 0.0, if on || response.hovered() { style.active_background } else { style.tab_background });
+                if on && on_pill.is_some() {
+                    // The same pill as the panel tabs' (see `dock_ui::majlis_tab_track`).
+                    let pill = Rect::from_min_max(pos2(tab.left() + 2.0, tab.top() + 5.0), pos2(tab.right() - 2.0, tab.bottom() - 5.0));
+                    painter.rect_filled(pill, pill.height() / 2.0, t.accent);
+                } else {
+                    painter.rect_filled(tab, 0.0, if on || response.hovered() { style.active_background } else { style.tab_background });
+                }
                 painter.galley(pos2(tab.min.x + TAB_PADDING * 0.5, mid - galley.size().y * 0.5), galley.clone(), color);
             },
         );
@@ -633,7 +648,7 @@ pub fn doc_tabs(
         // After the tab, so the × takes the clicks over it.
         if on || ui.rect_contains_pointer(tab.intersect(clip)) {
             let cr = Rect::from_center_size(pos2(label_end + DOC_CLOSE / 2.0, mid), vec2(10.0, 10.0));
-            if doc_close(ui, cr, tab.intersect(clip), doc, on, style, reg) {
+            if doc_close(ui, cr, tab.intersect(clip), doc, on, tab_style, reg) {
                 out.push(DocAction::Close(doc.id));
             }
         }

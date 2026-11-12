@@ -1,13 +1,13 @@
 {
-  "name": "EffectCraft",
-  "short_name": "EffectCraft",
+  "name": "Al Majlis Effects",
+  "short_name": "Al Majlis Effects",
   "description": "Motion graphics and visual effects compositor, in the browser",
   "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#1b1c1f",
-  "theme_color": "#1b1c1f",
+  "background_color": "#0d0d0f",
+  "theme_color": "#0d0d0f",
   "categories": ["graphics", "photo", "productivity"],
   "icons": [
     { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml" },

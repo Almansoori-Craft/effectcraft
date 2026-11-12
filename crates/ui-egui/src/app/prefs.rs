@@ -84,13 +84,13 @@ mod appearance_tests {
         app.set_pref("appearance.darkTheme", json!("darker")).unwrap();
         app.apply_prefs(&ctx);
         assert_eq!(app.ui.theme, ThemeKind::Darker);
-        for (mode, shown) in [("auto", ThemeKind::Darker), ("light", ThemeKind::Light), ("dark", ThemeKind::Darker), ("auto", ThemeKind::Darker)] {
+        for (mode, shown) in [("auto", ThemeKind::Darker), ("light", ThemeKind::MajlisLight), ("dark", ThemeKind::Darker), ("auto", ThemeKind::Darker)] {
             menus::invoke(&mut app, &ctx, "view.theme.toggle", json!({})).unwrap();
             assert_eq!(app.session.prefs.appearance.appearance_mode, mode);
             assert_eq!(app.ui.theme, shown, "{mode}");
             assert_eq!(app.tokens.kind, shown);
             assert_eq!(app.session.prefs.appearance.dark_theme, "darker");
-            assert_eq!(app.session.prefs.appearance.light_theme, "light");
+            assert_eq!(app.session.prefs.appearance.light_theme, "majlisLight");
         }
     }
 
@@ -106,18 +106,18 @@ mod appearance_tests {
         app.hooks.system_theme = Some(Box::new(move |_| *read.lock().unwrap_or_else(std::sync::PoisonError::into_inner)));
         app.set_pref("appearance.appearanceMode", json!("auto")).unwrap();
         app.apply_prefs(&ctx);
-        assert_eq!(app.ui.theme, ThemeKind::Light);
+        assert_eq!(app.ui.theme, ThemeKind::MajlisLight);
         *system.lock().unwrap() = Some(egui::Theme::Dark);
         app.apply_prefs(&ctx);
-        assert_eq!(app.ui.theme, ThemeKind::Dark, "a system change applies without a settings change");
+        assert_eq!(app.ui.theme, ThemeKind::MajlisDark, "a system change applies without a settings change");
         *system.lock().unwrap() = None;
         app.apply_prefs(&ctx);
-        assert_eq!(app.ui.theme, ThemeKind::Dark);
+        assert_eq!(app.ui.theme, ThemeKind::MajlisDark);
         // A fixed mode ignores the system.
         *system.lock().unwrap() = Some(egui::Theme::Light);
         app.set_pref("appearance.appearanceMode", json!("dark")).unwrap();
         app.apply_prefs(&ctx);
-        assert_eq!(app.ui.theme, ThemeKind::Dark);
+        assert_eq!(app.ui.theme, ThemeKind::MajlisDark);
     }
 
     /// Sync with System leaves egui's theme preference at System, so egui never gives the native
@@ -131,7 +131,7 @@ mod appearance_tests {
         app.hooks.system_theme = Some(Box::new(|_| Some(egui::Theme::Light)));
         app.set_pref("appearance.appearanceMode", json!("auto")).unwrap();
         app.apply_prefs(&ctx);
-        assert_eq!(app.ui.theme, ThemeKind::Light);
+        assert_eq!(app.ui.theme, ThemeKind::MajlisLight);
         assert_eq!(ctx.options(|o| o.theme_preference), egui::ThemePreference::System);
         for theme in [egui::Theme::Light, egui::Theme::Dark] {
             assert_eq!(ctx.style_of(theme).visuals.panel_fill, app.tokens.panel_bg, "{theme:?}");

@@ -15,10 +15,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ThemeKind {
-    #[default]
     Dark,
     Darker,
     Light,
+    /// Al Majlis light and dark (`docs/craft/MAJLIS_LOOK.md` in the Al Majlis repo): the exact
+    /// Al Majlis colours and its rounded shapes (pill tabs, hairline outlines). A fresh profile
+    /// shows Al Majlis Dark.
+    MajlisLight,
+    #[default]
+    MajlisDark,
 }
 
 impl ThemeKind {
@@ -27,6 +32,8 @@ impl ThemeKind {
             "dark" | "default" => Some(ThemeKind::Dark),
             "darker" | "darkest" => Some(ThemeKind::Darker),
             "light" => Some(ThemeKind::Light),
+            "majlislight" | "majlis-light" | "majlis_light" => Some(ThemeKind::MajlisLight),
+            "majlisdark" | "majlis-dark" | "majlis_dark" | "majlis" => Some(ThemeKind::MajlisDark),
             _ => None,
         }
     }
@@ -37,11 +44,18 @@ impl ThemeKind {
             ThemeKind::Dark => "dark",
             ThemeKind::Darker => "darker",
             ThemeKind::Light => "light",
+            ThemeKind::MajlisLight => "majlisLight",
+            ThemeKind::MajlisDark => "majlisDark",
         }
     }
 
     pub fn is_light(self) -> bool {
-        self == ThemeKind::Light
+        matches!(self, ThemeKind::Light | ThemeKind::MajlisLight)
+    }
+
+    /// The Al Majlis themes: rounded chrome, pill tabs and hairline outlines.
+    pub fn is_majlis(self) -> bool {
+        matches!(self, ThemeKind::MajlisLight | ThemeKind::MajlisDark)
     }
 }
 
@@ -103,6 +117,25 @@ pub struct Tokens {
     pub labels: [Color32; 17],
     pub radius: f32,
     pub radius_sm: f32,
+    /// Shapes (egui points): tool and icon buttons, fields and drop-downs, panel cards and effect
+    /// headers, windows and dialogs, menus, and a menu item's hover. Pills (tabs, text buttons,
+    /// chips) take half their height.
+    pub radius_control: f32,
+    pub radius_field: f32,
+    pub radius_card: f32,
+    pub radius_window: f32,
+    pub radius_menu: f32,
+    pub radius_menu_item: f32,
+    /// The 1 px outline of cards, fields and pills.
+    pub hairline: Color32,
+    /// A selected tool's fill and the soft accent of selected rows.
+    pub accent_soft: Color32,
+    /// Accent-coloured small text, readable on the panel.
+    pub accent_text: Color32,
+    /// The keyboard focus ring.
+    pub focus_ring: Color32,
+    /// Text and icons on an accent fill.
+    pub on_accent: Color32,
     pub gap: f32,
     pub tab_h: f32,
     pub row_h: f32,
@@ -110,6 +143,68 @@ pub struct Tokens {
     /// gradient (off: flat fills).
     pub gradients: bool,
 }
+
+/// The Al Majlis colours of one appearance (`docs/craft/MAJLIS_LOOK.md`, taken from Al Majlis'
+/// `src/app/globals.css`).
+struct MajlisPalette {
+    canvas: Color32,
+    surface: Color32,
+    raised: Color32,
+    pressed: Color32,
+    hairline: Color32,
+    text: Color32,
+    secondary: Color32,
+    muted: Color32,
+    accent: Color32,
+    accent_hover: Color32,
+    accent_text: Color32,
+    accent_soft: Color32,
+    focus_ring: Color32,
+    danger: Color32,
+    warning: Color32,
+}
+
+const fn hex(v: u32) -> Color32 {
+    Color32::from_rgb((v >> 16) as u8, (v >> 8) as u8, v as u8)
+}
+
+const MAJLIS_LIGHT: MajlisPalette = MajlisPalette {
+    canvas: hex(0xF2F1EE),
+    surface: hex(0xFFFFFF),
+    raised: hex(0xF6F5F3),
+    pressed: hex(0xE8E7E3),
+    hairline: hex(0xEEEEEE),
+    text: hex(0x141416),
+    secondary: hex(0x5B5B5C),
+    muted: hex(0x7E7E7F),
+    accent: hex(0x2563EB),
+    accent_hover: hex(0x1D4ED8),
+    accent_text: hex(0x1D4ED8),
+    accent_soft: hex(0xE9EFFD),
+    // #2563EB at 45 %.
+    focus_ring: Color32::from_rgba_unmultiplied_const(0x25, 0x63, 0xEB, 115),
+    danger: hex(0xB42318),
+    warning: hex(0xB54708),
+};
+
+const MAJLIS_DARK: MajlisPalette = MajlisPalette {
+    canvas: hex(0x0D0D0F),
+    surface: hex(0x17171A),
+    raised: hex(0x202024),
+    pressed: hex(0x2E2E34),
+    hairline: hex(0x29292B),
+    text: hex(0xF4F4F2),
+    secondary: hex(0xB2B2B1),
+    muted: hex(0x909091),
+    accent: hex(0x2563EB),
+    accent_hover: hex(0x3B82F6),
+    accent_text: hex(0x93C5FD),
+    accent_soft: hex(0x19233B),
+    // #60A5FA at 50 %.
+    focus_ring: Color32::from_rgba_unmultiplied_const(0x60, 0xA5, 0xFA, 128),
+    danger: hex(0xFDA29B),
+    warning: hex(0xFEC84B),
+};
 
 /// A vertical gradient fill (`top` → `bottom`) over `rect`.
 pub fn gradient_rect(painter: &egui::Painter, rect: egui::Rect, top: Color32, bottom: Color32) {
@@ -192,6 +287,17 @@ impl Tokens {
             labels: default_labels(),
             radius: 6.0,
             radius_sm: 3.0,
+            radius_control: 4.0,
+            radius_field: 3.0,
+            radius_card: 6.0,
+            radius_window: 8.0,
+            radius_menu: 6.0,
+            radius_menu_item: 3.0,
+            hairline: Color32::from_rgb(0x34, 0x34, 0x34),
+            accent_soft: Color32::from_rgb(0x2d, 0x8c, 0xeb),
+            accent_text: Color32::from_rgb(0x3d, 0x8f, 0xf5),
+            focus_ring: Color32::from_rgb(0xc8, 0xc8, 0xc8),
+            on_accent: Color32::WHITE,
             gap: 4.0,
             tab_h: 30.0,
             row_h: 19.0,
@@ -248,9 +354,87 @@ impl Tokens {
                 tl_work_area_bar: Color32::from_rgb(0x94, 0x94, 0x94),
                 expr_bg: Color32::from_rgb(0xf2, 0xf2, 0xf2),
                 expr_text: Color32::from_rgb(0xa3, 0x34, 0x17),
+                hairline: Color32::from_rgb(0xc8, 0xc8, 0xc8),
+                accent_text: Color32::from_rgb(0x00, 0x5a, 0x9c),
+                focus_ring: Color32::from_rgb(0x22, 0x22, 0x22),
                 ..dark
             },
+            ThemeKind::MajlisLight => Tokens::majlis_tokens(kind, &MAJLIS_LIGHT, dark),
+            ThemeKind::MajlisDark => Tokens::majlis_tokens(kind, &MAJLIS_DARK, dark),
         }
+    }
+
+    /// The Al Majlis tokens from palette `m`. What the look sheet does not name (cache bars,
+    /// keyframes, labels, the pasteboard around the image) keeps the classic values.
+    fn majlis_tokens(kind: ThemeKind, m: &MajlisPalette, base: Tokens) -> Tokens {
+        let light = kind.is_light();
+        let grey = |v: u8| Color32::from_rgb(v, v, v);
+        Tokens {
+            kind,
+            app_bg: m.canvas,
+            header_bg: m.surface,
+            panel_bg: m.surface,
+            tab_text: m.muted,
+            tab_text_active: m.text,
+            focus: m.accent,
+            accent: m.accent,
+            accent_hover: m.accent_hover,
+            text: m.text,
+            text_dim: m.secondary,
+            text_faint: m.muted,
+            icon: m.secondary,
+            icon_active: m.text,
+            hover: m.raised,
+            pressed: m.pressed,
+            field_bg: m.raised,
+            field_border: m.hairline,
+            separator: m.hairline,
+            row: m.surface,
+            row_alt: m.raised,
+            row_selected: m.accent_soft,
+            hot_text: m.accent_text,
+            tl_bg: m.canvas,
+            tl_ruler_bg: m.surface,
+            tl_ruler_tick: m.muted,
+            tl_ruler_text: m.secondary,
+            cti: m.accent,
+            work_area: if light { m.pressed } else { base.work_area },
+            keyframe: if light { grey(0x6c) } else { base.keyframe },
+            keyframe_selected: m.accent,
+            // The surround of the user's image keeps a neutral grey, so colours are judged as before.
+            pasteboard: if light { grey(0xa8) } else { base.pasteboard },
+            timecode: m.accent_text,
+            danger: m.danger,
+            warning: m.warning,
+            fx_header: m.raised,
+            fx_header_active: m.accent_soft,
+            tl_graph_selected: m.pressed,
+            switch_well: m.canvas,
+            tl_nav_bar: if light { grey(0x9a) } else { base.tl_nav_bar },
+            tl_work_area_bar: if light { grey(0x94) } else { base.tl_work_area_bar },
+            expr_bg: m.raised,
+            expr_text: if light { Color32::from_rgb(0xa3, 0x34, 0x17) } else { base.expr_text },
+            radius: 12.0,
+            radius_sm: 8.0,
+            radius_control: 8.0,
+            radius_field: 8.0,
+            radius_card: 12.0,
+            radius_window: 16.0,
+            radius_menu: 12.0,
+            radius_menu_item: 8.0,
+            hairline: m.hairline,
+            accent_soft: m.accent_soft,
+            accent_text: m.accent_text,
+            focus_ring: m.focus_ring,
+            on_accent: Color32::WHITE,
+            gradients: false,
+            ..base
+        }
+    }
+
+    /// Whether the chrome takes the Al Majlis shapes (pill tabs, outlined selected tools).
+    pub fn majlis(&self) -> bool {
+        self.kind.is_majlis()
     }
 
     pub fn mono(size: f32) -> FontId {
@@ -280,7 +464,8 @@ impl Tokens {
             let [r, g, b] = p.label_rgb(*l);
             t.labels[i] = Color32::from_rgb(r, g, b);
         }
-        t.gradients = p.appearance.use_gradients;
+        // Al Majlis fills are flat.
+        t.gradients = p.appearance.use_gradients && !kind.is_majlis();
         t
     }
 
@@ -318,6 +503,7 @@ impl Tokens {
             &mut self.tl_graph_selected,
             &mut self.switch_well,
             &mut self.expr_bg,
+            &mut self.hairline,
         ] {
             adj(c);
         }
@@ -598,13 +784,24 @@ pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
     v.selection.bg_fill = t.accent;
     v.selection.stroke = Stroke::new(1.0, Color32::WHITE);
     v.hyperlink_color = t.accent;
-    v.window_stroke = Stroke::new(1.0, t.field_border);
-    v.window_corner_radius = egui::CornerRadius::same(8);
-    v.menu_corner_radius = egui::CornerRadius::same(6);
-    v.popup_shadow = egui::epaint::Shadow { offset: [0, 6], blur: 20, spread: 0, color: Color32::from_black_alpha(150) };
-    v.window_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 36, spread: 0, color: Color32::from_black_alpha(170) };
+    let majlis = t.majlis();
+    let r = |x: f32| egui::CornerRadius::same(x.round().clamp(0.0, 255.0) as u8);
+    v.window_stroke = Stroke::new(1.0, if majlis { t.hairline } else { t.field_border });
+    v.window_corner_radius = r(t.radius_window);
+    v.menu_corner_radius = r(t.radius_menu);
+    if majlis {
+        // Al Majlis floating cards: a soft shadow, deeper in dark.
+        let (popup, window) = if light { (28, 36) } else { (120, 150) };
+        v.popup_shadow = egui::epaint::Shadow { offset: [0, 8], blur: 24, spread: 0, color: Color32::from_black_alpha(popup) };
+        v.window_shadow = egui::epaint::Shadow { offset: [0, 12], blur: 40, spread: 0, color: Color32::from_black_alpha(window) };
+        // Sliders fill up to the knob in the accent.
+        v.slider_trailing_fill = true;
+    } else {
+        v.popup_shadow = egui::epaint::Shadow { offset: [0, 6], blur: 20, spread: 0, color: Color32::from_black_alpha(150) };
+        v.window_shadow = egui::epaint::Shadow { offset: [0, 10], blur: 36, spread: 0, color: Color32::from_black_alpha(170) };
+    }
     for w in [&mut v.widgets.noninteractive, &mut v.widgets.inactive, &mut v.widgets.hovered, &mut v.widgets.active, &mut v.widgets.open] {
-        w.corner_radius = egui::CornerRadius::same(t.radius_sm as u8);
+        w.corner_radius = r(if majlis { t.radius_field } else { t.radius_sm });
     }
     v.widgets.noninteractive.bg_fill = t.panel_bg;
     v.widgets.noninteractive.weak_bg_fill = t.panel_bg;
@@ -623,6 +820,25 @@ pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
     v.widgets.active.fg_stroke = Stroke::new(1.0, t.tab_text_active);
     v.widgets.open.bg_fill = t.hover;
     v.widgets.open.weak_bg_fill = t.hover;
+    if majlis {
+        // Buttons (their weak fill) are raised with a hairline. Check boxes, slider rails and
+        // scroll handles (the plain fill) take the pressed colour, hovered or dragged the muted
+        // text colour.
+        let hairline = Stroke::new(1.0, t.hairline);
+        v.widgets.noninteractive.bg_stroke = hairline;
+        v.widgets.inactive.bg_fill = t.pressed;
+        v.widgets.inactive.weak_bg_fill = t.field_bg;
+        v.widgets.inactive.bg_stroke = hairline;
+        v.widgets.hovered.bg_fill = t.text_faint;
+        v.widgets.hovered.weak_bg_fill = t.pressed;
+        v.widgets.hovered.bg_stroke = hairline;
+        v.widgets.active.bg_fill = t.text_faint;
+        v.widgets.active.weak_bg_fill = t.pressed;
+        v.widgets.active.bg_stroke = Stroke::new(1.5, t.accent);
+        v.widgets.open.weak_bg_fill = t.pressed;
+        v.widgets.open.bg_stroke = hairline;
+        v.selection.stroke = Stroke::new(1.0, t.on_accent);
+    }
     // egui keeps one style per light/dark theme and picks it by its theme preference (see
     // [`theme_preference`]); both get ours, so whichever it picks, egui's defaults never show.
     ctx.all_styles_mut(|s| {
@@ -636,7 +852,8 @@ pub fn apply_visuals(ctx: &egui::Context, t: &Tokens) {
         s.spacing.scroll = egui::style::ScrollStyle::solid();
         // The handle takes the text colour: the fill it would otherwise get is the colour of its
         // track (both are the field background), which left it invisible until hovered.
-        s.spacing.scroll.foreground_color = true;
+        // Al Majlis: a thin pill in the pressed colour (the muted text colour while hovered).
+        s.spacing.scroll.foreground_color = !majlis;
         s.text_styles.insert(TextStyle::Body, FontId::new(12.0, FontFamily::Proportional));
         s.text_styles.insert(TextStyle::Button, FontId::new(12.0, FontFamily::Proportional));
         s.text_styles.insert(TextStyle::Small, FontId::new(11.0, FontFamily::Proportional));

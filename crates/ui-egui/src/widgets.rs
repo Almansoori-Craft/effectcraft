@@ -269,7 +269,7 @@ pub fn twirl(ui: &mut Ui, rect: Rect, open: bool, id: egui::Id, t: &Tokens) -> R
 pub fn icon_toggle(ui: &mut Ui, rect: Rect, icon: Icon, on: bool, t: &Tokens, id: egui::Id, sense: Sense) -> Response {
     let resp = ui.interact(rect, id, sense);
     if resp.hovered() {
-        ui.painter().rect_filled(rect, 2.0, t.hover);
+        ui.painter().rect_filled(rect, if t.majlis() { (t.radius_control / 2.0).min(rect.height() / 2.0) } else { 2.0 }, t.hover);
     }
     if on || resp.hovered() {
         icons::paint(ui.painter(), rect.shrink(rect.width() * 0.18), icon, if on { t.icon } else { t.text_faint });
@@ -286,13 +286,17 @@ pub fn icon_toggle(ui: &mut Ui, rect: Rect, icon: Icon, on: bool, t: &Tokens, id
 pub fn icon_button(ui: &mut Ui, rect: Rect, icon: Icon, active: bool, t: &Tokens, id: egui::Id) -> Response {
     let resp = ui.interact(rect, id, Sense::click());
     resp.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, ui.is_enabled(), active, ""));
-    if active {
-        ui.painter().rect_filled(rect, 4.0, t.accent);
+    let r = t.radius_control;
+    if active && t.majlis() {
+        // Al Majlis: a selected tool is a soft accent box with a 1 px accent outline.
+        ui.painter().rect(rect, r, t.accent_soft, Stroke::new(1.0, t.accent), StrokeKind::Inside);
+    } else if active {
+        ui.painter().rect_filled(rect, r, t.accent);
     } else if resp.hovered() {
-        ui.painter().rect_filled(rect, 4.0, t.hover);
+        ui.painter().rect_filled(rect, r, t.hover);
     }
     let col = if active {
-        Color32::WHITE
+        active_icon(t)
     } else if resp.hovered() {
         t.icon_active
     } else {
@@ -305,10 +309,24 @@ pub fn icon_button(ui: &mut Ui, rect: Rect, icon: Icon, active: bool, t: &Tokens
     resp
 }
 
+/// The colour of an icon on a selected tool or icon button: white on the accent fill, the accent
+/// text colour on Al Majlis' soft accent box.
+pub fn active_icon(t: &Tokens) -> Color32 {
+    if t.majlis() { t.accent_text } else { Color32::WHITE }
+}
+
 /// Keep keyboard focus visible on custom-painted controls, including their active state.
 pub fn focus_outline(ui: &Ui, response: &Response, t: &Tokens) {
     if response.has_focus() {
-        ui.painter().rect_stroke(response.rect.shrink(1.0), 4.0, Stroke::new(2.0, t.text), StrokeKind::Inside);
+        if t.majlis() {
+            // The Al Majlis focus ring: 1.5 px, as rounded as the control.
+            let r = response.rect.shrink(0.5);
+            let radius = t.radius_control.min(r.height() / 2.0);
+            ui.painter().rect_stroke(r, radius, Stroke::new(1.5, t.accent), StrokeKind::Inside);
+            ui.painter().rect_stroke(r.expand(1.5), radius + 1.5, Stroke::new(1.5, t.focus_ring), StrokeKind::Inside);
+        } else {
+            ui.painter().rect_stroke(response.rect.shrink(1.0), 4.0, Stroke::new(2.0, t.text), StrokeKind::Inside);
+        }
     }
 }
 
@@ -338,8 +356,10 @@ pub fn text_field(ui: &mut Ui, rect: Rect, text: &mut String, hint: &str, t: &To
 /// and returns its response.
 fn field(ui: &mut Ui, rect: Rect, text: &mut String, hint: &str, t: &Tokens, search: bool) -> Response {
     let h = rect.height();
-    ui.painter().rect_filled(rect, h / 2.0, t.field_bg);
-    ui.painter().rect_stroke(rect, h / 2.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    // Al Majlis fields are rounded boxes (the classic ones pills).
+    let radius = if t.majlis() { t.radius_field.min(h / 2.0) } else { h / 2.0 };
+    ui.painter().rect_filled(rect, radius, t.field_bg);
+    ui.painter().rect_stroke(rect, radius, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
     if search {
         icons::paint(ui.painter(), Rect::from_center_size(pos2(rect.min.x + 12.0, rect.center().y), vec2(12.0, 12.0)), Icon::Search, t.text_dim);
     }
@@ -355,6 +375,10 @@ fn field(ui: &mut Ui, rect: Rect, text: &mut String, hint: &str, t: &Tokens, sea
             .font(Tokens::ui(12.0))
             .align(egui::Align2::LEFT_CENTER),
     );
+    if t.majlis() && resp.has_focus() {
+        // Al Majlis: a focused field gets a 1.5 px accent outline.
+        ui.painter().rect_stroke(rect, radius, Stroke::new(1.5, t.accent), StrokeKind::Inside);
+    }
     // The hint is the field's visible name (the caller can give it a better one).
     crate::a11y::name(&resp, hint);
     resp
@@ -377,8 +401,16 @@ pub fn dropdown_tip(ui: &mut Ui, rect: Rect, text: &str, tip: Option<&str>, t: &
         _ => crate::i18n::tr("Options").to_string(),
     };
     resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, ui.is_enabled(), &name));
-    ui.painter().rect_filled(rect, 3.0, if resp.hovered() { t.hover } else { t.field_bg });
-    ui.painter().rect_stroke(rect, 3.0, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
+    let radius = t.radius_field.min(rect.height() / 2.0);
+    let fill = if !resp.hovered() {
+        t.field_bg
+    } else if t.majlis() {
+        t.pressed
+    } else {
+        t.hover
+    };
+    ui.painter().rect_filled(rect, radius, fill);
+    ui.painter().rect_stroke(rect, radius, Stroke::new(1.0, t.field_border), StrokeKind::Inside);
     // Text that doesn't fit before the arrow is elided (narrow panels).
     let room = rect.width() - 7.0 - 18.0;
     let fits = |s: &str| ui.painter().layout_no_wrap(s.to_string(), Tokens::ui(11.5), t.text).size().x <= room;
@@ -422,7 +454,11 @@ pub fn text_button(ui: &mut Ui, rect: Rect, text: &str, primary: bool, t: &Token
         t.hover
     };
     ui.painter().rect_filled(rect, rect.height() / 2.0, bg);
-    ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, Tokens::medium(12.0), if primary { Color32::WHITE } else { t.text });
+    if t.majlis() && !primary {
+        // Al Majlis secondary buttons: a raised pill with a hairline.
+        ui.painter().rect_stroke(rect, rect.height() / 2.0, Stroke::new(1.0, t.hairline), StrokeKind::Inside);
+    }
+    ui.painter().text(rect.center(), Align2::CENTER_CENTER, text, Tokens::medium(12.0), if primary { t.on_accent } else { t.text });
     crate::a11y::role_name(&resp, egui::accesskit::Role::Button, text);
     focus_outline(ui, &resp, t);
     resp
@@ -596,11 +632,13 @@ pub fn checkbox(ui: &mut Ui, rect: Rect, on: bool, t: &Tokens, id: egui::Id) -> 
     }
     let on = next.unwrap_or(on);
     let b = Rect::from_center_size(rect.center(), vec2(12.0, 12.0));
-    ui.painter().rect_filled(b, 2.0, if on { t.accent } else { t.field_bg });
-    ui.painter().rect_stroke(b, 2.0, Stroke::new(1.0, if on { t.accent } else { t.field_border }), StrokeKind::Inside);
+    // Al Majlis: a softer, rounder box with a hairline.
+    let (radius, border) = if t.majlis() { (4.0, t.hairline) } else { (2.0, t.field_border) };
+    ui.painter().rect_filled(b, radius, if on { t.accent } else { t.field_bg });
+    ui.painter().rect_stroke(b, radius, Stroke::new(1.0, if on { t.accent } else { border }), StrokeKind::Inside);
     if on {
         let p = |x: f32, y: f32| pos2(b.min.x + x * b.width(), b.min.y + y * b.height());
-        ui.painter().line(vec![p(0.2, 0.52), p(0.42, 0.74), p(0.8, 0.28)], Stroke::new(1.6, Color32::WHITE));
+        ui.painter().line(vec![p(0.2, 0.52), p(0.42, 0.74), p(0.8, 0.28)], Stroke::new(1.6, t.on_accent));
     }
     focus_outline(ui, &resp, t);
     resp
@@ -638,8 +676,17 @@ pub fn scroll_bar(ui: &mut Ui, auto: &mut Registry, key: &str, track: Rect, scro
     } else {
         Rect::from_min_size(pos2(thumb_at(s), track.min.y), vec2(thumb_len, track.height()))
     };
-    ui.painter().rect_filled(track, 2.0, t.field_bg);
-    ui.painter().rect_filled(thumb, 2.0, if resp.hovered() || resp.dragged() { t.text_dim } else { t.text_faint });
+    if t.majlis() {
+        // Al Majlis: a thin pill in the pressed colour, the muted text colour while used.
+        let w = track.size()[1 - a];
+        let thin = |r: Rect| if vertical { r.shrink2(vec2(w * 0.2, 0.0)) } else { r.shrink2(vec2(0.0, w * 0.2)) };
+        let thumb = thin(thumb);
+        let radius = thumb.size()[1 - a] / 2.0;
+        ui.painter().rect_filled(thumb, radius, if resp.hovered() || resp.dragged() { t.text_faint } else { t.pressed });
+    } else {
+        ui.painter().rect_filled(track, 2.0, t.field_bg);
+        ui.painter().rect_filled(thumb, 2.0, if resp.hovered() || resp.dragged() { t.text_dim } else { t.text_faint });
+    }
     auto.add(key, track, &format!("{s}/{max}"));
     if s != scroll {
         ui.ctx().request_repaint();

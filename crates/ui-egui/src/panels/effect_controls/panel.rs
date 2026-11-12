@@ -141,7 +141,7 @@ fn about_button(app: &mut EffectcraftApp, ui: &mut egui::Ui, bp: &egui::Painter,
         let lines = vec![
             crate::i18n::effects::name(spec.id, spec.name),
             format!("Category: {}", crate::i18n::effects::category(spec.category)),
-            "EffectCraft built-in effect (MIT OR Apache-2.0)".to_string(),
+            "Built-in effect".to_string(),
         ];
         let _ = widgets::popup_menu(ui, apop, about.left_bottom(), &lines, None);
     }
@@ -218,11 +218,20 @@ pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
         let open = !app.ui.fx_closed.contains(&g.uid);
         let selected = app.session.state.selected_props.iter().any(|(l, u)| *l == layer.id && *u == g.uid);
         let active = effect_active(g, layer.id, &app.session.state.selected_props);
-        bp.rect_filled(r, 0.0, if active { t.fx_header_active } else { t.fx_header });
+        let header_fill = if active { t.fx_header_active } else { t.fx_header };
+        if t.majlis() {
+            // Al Majlis: a rounded header card with a hairline, a little apart from its neighbours.
+            let card = r.shrink2(vec2(2.0, 1.0));
+            bp.rect(card, t.radius_field, header_fill, Stroke::new(1.0, t.hairline), egui::StrokeKind::Inside);
+        } else {
+            bp.rect_filled(r, 0.0, header_fill);
+        }
         // The effect's colour label (26.5): a bar on the header's left edge.
         if let Some(lab) = g.label.filter(|l| *l != effectcraft_engine::color::Label::None) {
             let [lr, lg, lb] = app.session.prefs.label_rgb(lab);
-            bp.rect_filled(Rect::from_min_size(r.min, vec2(4.0, r.height())), 0.0, Color32::from_rgb(lr, lg, lb));
+            let bar = Rect::from_min_size(r.min, vec2(4.0, r.height()));
+            let (bar, radius) = if t.majlis() { (bar.translate(vec2(2.0, 0.0)).shrink2(vec2(0.0, 1.0)), 2.0) } else { (bar, 0.0) };
+            bp.rect_filled(bar, radius, Color32::from_rgb(lr, lg, lb));
             app.auto.add(
                 &format!("effectControls.effect.{}.label", g.uid),
                 Rect::from_min_size(r.min, vec2(4.0, r.height())),

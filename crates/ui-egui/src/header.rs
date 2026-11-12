@@ -1,5 +1,4 @@
-//! The Tools bar: home, the tool slots, tool options, snapping, workspaces and the community
-//! buttons (Discord is always one click away).
+//! The Tools bar: About, home, the tool slots, tool options, snapping, appearance and workspaces.
 
 use crate::i18n::{tr, tr_args};
 use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
@@ -16,15 +15,16 @@ use effectcraft_engine::geom::vec2 as gv2;
 use effectcraft_engine::project::{LayerId, LayerSource, PropGroup};
 use effectcraft_engine::viewer as vw;
 
-/// Draws the Tools bar into `rect`: brand (About), Home, the tool slots with their fly-out
+/// Draws the Tools bar into `rect`: About, Home, the tool slots with their fly-out
 /// menus and press-and-hold picks, options for the active tool (shape paint, puppet, roto),
-/// Snapping, then Discord, GitHub, website, appearance and workspace controls. Clicks apply
+/// Snapping, then appearance and workspace controls. Clicks apply
 /// tool, dialog, theme and workspace changes to `app` or run their commands.
 pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     let t = app.tokens;
     let p = ui.painter().clone();
     p.rect_filled(rect, 0.0, t.header_bg);
-    p.line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, t.app_bg));
+    // Al Majlis: a hairline under the bar instead of a hard divider.
+    p.line_segment([rect.left_bottom(), rect.right_bottom()], Stroke::new(1.0, if t.majlis() { t.hairline } else { t.app_bg }));
     let cy = rect.center().y;
     let x = rect.min.x + if app.integrated_titlebar && !app.ui.show_menu_bar { 80.0 } else { 10.0 };
     let x = brand_and_home(app, ui, &p, x, cy);
@@ -34,15 +34,14 @@ pub fn show(app: &mut EffectcraftApp, ui: &mut egui::Ui, rect: Rect) {
     right_side(app, ui, &p, rect, x, cy);
 }
 
-/// The brand mark (About) and the Home button; returns the x after them.
+/// The About button and the Home button; returns the x after them.
 fn brand_and_home(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, mut x: f32, cy: f32) -> f32 {
     let t = app.tokens;
+    // Al Majlis Effects draws no upstream logo: About is an icon button in the brand's place.
     let brand = Rect::from_min_size(pos2(x, cy - 12.0), vec2(24.0, 24.0));
-    paint_logo(p, brand);
-    let bresp = ui.interact(brand, egui::Id::unique("brand"), Sense::click());
-    app.auto.add_response("header.about", &bresp, "About EffectCraft");
-    widgets::focus_outline(ui, &bresp, &t);
-    if bresp.on_hover_text(tr("About EffectCraft")).clicked() {
+    let bresp = widgets::icon_button(ui, brand, Icon::Sparkle, false, &t, egui::Id::unique("brand"));
+    app.auto.add_response("header.about", &bresp, "About Al Majlis Effects");
+    if bresp.on_hover_text(tr("About Al Majlis Effects")).clicked() {
         app.dialog = Some(Dialog::About);
     }
     x += 32.0;
@@ -89,7 +88,7 @@ fn tool_slot(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, si:
         // Flyout corner triangle.
         p.add(egui::Shape::convex_polygon(
             vec![pos2(r.max.x - 2.0, r.max.y - 6.0), pos2(r.max.x - 2.0, r.max.y - 2.0), pos2(r.max.x - 6.0, r.max.y - 2.0)],
-            if active { Color32::WHITE } else { t.text_dim },
+            if active { widgets::active_icon(&t) } else { t.text_dim },
             Stroke::NONE,
         ));
     }
@@ -283,46 +282,16 @@ fn snapping_toggle(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painte
     x
 }
 
-/// Right side: community buttons, appearance and workspaces; `left` is where the tools end.
+/// Right side: appearance and workspaces; `left` is where the tools end. (Al Majlis Effects shows
+/// no community, website or source-code buttons.)
 fn right_side(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, rect: Rect, left: f32, cy: f32) {
     let t = app.tokens;
-    let rx = community_buttons(app, ui, p, rect.max.x - 10.0, cy);
-    let mut rx = appearance_button(app, ui, rx, cy);
+    let mut rx = appearance_button(app, ui, rect.max.x - 10.0, cy);
     rx -= 10.0;
     p.line_segment([pos2(rx, cy - 10.0), pos2(rx, cy + 10.0)], Stroke::new(1.0, t.separator));
     rx -= 10.0;
     let rx = workspace_menu(app, ui, p, rx, cy);
     workspace_tabs(app, ui, p, rx, left, cy);
-}
-
-/// The Discord pill and the GitHub and website buttons, right to left from `rx`; returns the new `rx`.
-fn community_buttons(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, mut rx: f32, cy: f32) -> f32 {
-    let t = app.tokens;
-    // The pill fits its label (icon, gap, text) with even padding: it was a fixed 104 px with the
-    // text at its left, which left a wide gap on the right (#581).
-    let label = p.layout_no_wrap(tr("Discord").to_string(), Tokens::semibold(12.0), Color32::WHITE);
-    let discord = Rect::from_min_max(pos2(rx - (10.0 + 14.0 + 6.0 + label.size().x + 12.0), cy - 13.0), pos2(rx, cy + 13.0));
-    let dresp = ui.interact(discord, egui::Id::unique("hdr-discord"), Sense::click());
-    let dc = Color32::from_rgb(0x58, 0x65, 0xf2);
-    p.rect_filled(discord, 13.0, if dresp.hovered() { dc.gamma_multiply(1.2) } else { dc });
-    icons::paint(p, Rect::from_center_size(pos2(discord.min.x + 17.0, cy), vec2(14.0, 14.0)), Icon::Chat, Color32::WHITE);
-    p.galley(pos2(discord.min.x + 30.0, cy - label.size().y / 2.0), label, Color32::WHITE);
-    app.auto.add("header.discord", discord, "Join the ArtCraft Discord");
-    if dresp.on_hover_text(tr("Join the ArtCraft community on Discord")).clicked() {
-        let _ = app.session.execute("help.discord", json!({}));
-    }
-    rx = discord.min.x - 6.0;
-    for (id, icon, tip, cmd) in
-        [("hdr-github", Icon::Code, "EffectCraft on GitHub", "help.github"), ("hdr-web", Icon::Globe, "EffectCraft on getartcraft.com", "help.appPage")]
-    {
-        let r = Rect::from_min_max(pos2(rx - 26.0, cy - 13.0), pos2(rx, cy + 13.0));
-        if widgets::icon_button(ui, r, icon, false, &t, egui::Id::unique(id)).on_hover_text(tip).clicked() {
-            let _ = app.session.execute(cmd, json!({}));
-        }
-        app.auto.add(&format!("header.{}", &id[4..]), r, tip);
-        rx = r.min.x - 4.0;
-    }
-    rx
 }
 
 /// Appearance: Sync with System, Light, Dark (a monitor, sun or moon), one click to the next;
@@ -402,6 +371,7 @@ fn workspace_menu(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter
 fn workspace_tabs(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter, mut rx: f32, left: f32, cy: f32) {
     let t = app.tokens;
     let shown = ["Standard", "Small Screen", "Learn", "Review", "Default"];
+    let mut tabs = Vec::new();
     for name in shown {
         let g = p.layout_no_wrap(crate::i18n::command_label("window.workspace", name).to_string(), Tokens::ui(12.0), t.text);
         let w = g.size().x + 16.0;
@@ -409,24 +379,41 @@ fn workspace_tabs(app: &mut EffectcraftApp, ui: &mut egui::Ui, p: &egui::Painter
         if r.min.x < left + 120.0 {
             break;
         }
+        rx = r.min.x - 2.0;
+        tabs.push((name, g, r));
+    }
+    let majlis = t.majlis();
+    if majlis && let (Some((_, _, first)), Some((_, _, last))) = (tabs.first(), tabs.last()) {
+        // Al Majlis: the workspaces are pill tabs in a rounded track.
+        let track = Rect::from_min_max(pos2(last.min.x - 3.0, cy - 13.0), pos2(first.max.x + 3.0, cy + 13.0));
+        p.rect(track, track.height() / 2.0, t.field_bg, Stroke::new(1.0, t.hairline), StrokeKind::Inside);
+    }
+    for (name, g, r) in tabs {
         let active = app.ui.workspace == name;
         let resp = ui.interact(r, egui::Id::unique(("ws", name)), Sense::click());
-        let col = if active {
+        let col = if active && majlis {
+            t.on_accent
+        } else if active {
             t.hot_text
         } else if resp.hovered() {
             t.text
+        } else if majlis {
+            t.tab_text
         } else {
             t.text_dim
         };
+        if active && majlis {
+            let pill = r.shrink2(vec2(0.0, 3.0));
+            p.rect_filled(pill, pill.height() / 2.0, t.accent);
+        }
         p.galley_with_override_text_color(pos2(r.min.x + 8.0, cy - g.size().y / 2.0), g, col);
-        if active {
+        if active && !majlis {
             p.line_segment([pos2(r.min.x + 8.0, r.max.y - 3.0), pos2(r.max.x - 8.0, r.max.y - 3.0)], Stroke::new(2.0, t.hot_text));
         }
         app.auto.add(&format!("header.workspace.{name}"), r, name);
         if resp.clicked() {
             app.set_workspace(name);
         }
-        rx = r.min.x - 2.0;
         // Right-clicking a workspace opens the same options as the » button, which is where After
         // Effects keeps them (reset, save, save a copy, edit).
         let target = name.to_string();
@@ -901,27 +888,11 @@ fn run_workspace_command(app: &mut EffectcraftApp, ui: &egui::Ui, id: &str) {
     }
 }
 
-/// The ArtCraft mark as supplied in `docs/brand` (the README's and getartcraft.com's logo; used
-/// unmodified, see `docs/brand/LICENSE-brand.txt`).
-static ARTCRAFT_MARK: &[u8] = include_bytes!("../../../docs/brand/artcraft-mark.png");
-
-/// The ArtCraft mark in `r` (decoded once into a mipmapped texture, so it stays crisp from the
-/// 24 px Tools bar to the About dialog). Nothing is drawn if it can't be decoded.
-pub fn paint_logo(p: &egui::Painter, r: Rect) {
-    let ctx = p.ctx();
-    let id = egui::Id::unique("artcraft-mark");
-    let tex = ctx.data(|d| d.get_temp::<Option<egui::TextureHandle>>(id)).unwrap_or_else(|| {
-        let tex = image::load_from_memory_with_format(ARTCRAFT_MARK, image::ImageFormat::Png).ok().map(|img| {
-            let img = img.to_rgba8();
-            let ci = egui::ColorImage::from_rgba_unmultiplied([img.width() as usize, img.height() as usize], img.as_raw());
-            ctx.load_texture("artcraft-mark", ci, egui::TextureOptions::LINEAR.with_mipmap_mode(Some(egui::TextureFilter::Linear)))
-        });
-        ctx.data_mut(|d| d.insert_temp(id, tex.clone()));
-        tex
-    });
-    if let Some(t) = tex {
-        p.image(t.id(), r, Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)), Color32::WHITE);
-    }
+/// The Al Majlis Effects mark in `r`: a sparkle on an accent rounded square (the brand licence
+/// asks forks to drop the upstream logo; the approved app icon replaces this later).
+pub fn paint_logo(p: &egui::Painter, r: Rect, t: &Tokens) {
+    p.rect_filled(r, r.height() * 0.28, t.accent);
+    icons::paint(p, r.shrink(r.width() * 0.22), Icon::Sparkle, t.on_accent);
 }
 
 #[cfg(test)]

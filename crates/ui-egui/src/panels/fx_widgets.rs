@@ -133,9 +133,9 @@ pub fn crosshair_button(ui: &mut egui::Ui, rect: Rect, active: bool, id: egui::I
     let resp = ui.interact(rect, id, Sense::click());
     let p = ui.painter();
     if active {
-        p.rect_filled(rect, 3.0, t.accent);
+        p.rect_filled(rect, t.radius_sm, t.accent);
     } else if resp.hovered() {
-        p.rect_filled(rect, 3.0, t.hover);
+        p.rect_filled(rect, t.radius_sm, t.hover);
     }
     let col = if active {
         Color32::WHITE
@@ -161,9 +161,9 @@ pub fn eyedropper_button(ui: &mut egui::Ui, rect: Rect, active: bool, id: egui::
     let resp = ui.interact(rect, id, Sense::click());
     let p = ui.painter();
     if active {
-        p.rect_filled(rect, 3.0, t.accent);
+        p.rect_filled(rect, t.radius_sm, t.accent);
     } else if resp.hovered() {
-        p.rect_filled(rect, 3.0, t.hover);
+        p.rect_filled(rect, t.radius_sm, t.hover);
     }
     let col = if active {
         Color32::WHITE
