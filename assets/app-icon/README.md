@@ -1,40 +1,18 @@
-# EffectCraft app icon
+# Al Majlis Effects app icon
 
-**Creature:** a unicorn, as an engraved head-and-shoulders bust looking out of the tile.
+Al Majlis Studio icon, made for the Ministry with Higgsfield (Ideogram Vector), 2026-11-12. Owner approved 2026-11-12.
 
-**Style:** an ink engraving portrait in the Crafting Apps' owl-template framing (the FilmCraft owl):
-full-bleed colour field, tight head-and-shoulders crop, the body running off the bottom and right edges.
-
-**Tile:** 512 × 512 viewBox, rounded square `rx=112`, clipped; no border or roundel.
-
-**Palette** (exactly three colours):
-
-| Colour | Hex | Used for |
-|---|---|---|
-| App colour (EffectCraft pink) | `#e0368f` | the full-bleed field |
-| Paper | `#efe9dc` | the figure |
-| Ink | `#0b0b0c` | line work and contour |
-
-**Provenance:** the project owner drew it in ArtCraft (a 2880 px engraving-style image). It was
-vectorised with potrace, which keys out the field and traces the ink.
-Licence: see [LICENSE.txt](LICENSE.txt) (MIT OR Apache-2.0, like the repo).
+The Al Majlis Studio family look: an Al Majlis blue rounded tile (`#2a78f9`, corner radius 20 % of
+the tile, transparent corners) with a white line glyph: a crescent moon and a four-point sparkle.
 
 ## Files
 
 | File | What |
 |---|---|
-| `effectcraft.svg` | master vector, traced at 2048 px (canonical) |
-| `effectcraft-small.svg` | lighter vector (~350 KB), traced at 1024 px; also the web favicon |
-| `effectcraft-1024.png` | 1024 px render |
-| `effectcraft-macos-512.png` | runtime Dock icon on macOS, on Apple's 824/1024 grid |
-| `effectcraft.icns` | macOS icon (Apple grid) |
-| `effectcraft.ico` | Windows icon, 16–256 px; embedded in `effectcraft.exe` by `apps/effectcraft/build.rs` |
-| `hicolor/<n>x<n>/apps/ai.storyteller.effectcraft.png` | Linux icon theme, 16–512 px; the 256 px one is the runtime icon on Windows and Linux |
-| `hicolor/scalable/apps/ai.storyteller.effectcraft.svg` | Linux scalable icon |
+| `effectcraft.svg`, `effectcraft-small.svg`, `hicolor/scalable/apps/ai.storyteller.effectcraft.svg` | the vector (the approved trace, cropped and clipped to the rounded tile) |
+| `hicolor/<n>x<n>/apps/ai.storyteller.effectcraft.png` | full-bleed renders, 16-512 px; the 128 px one is the in-app mark and About icon, the 256 px one the window icon |
+| `effectcraft-1024.png`, `effectcraft-macos-512.png`, `effectcraft.icns`, `effectcraft.ico` | the same tile at the placement each file had before (Apple grid on macOS, full bleed on Windows) |
+| `apps/effectcraft-web/web/favicon.svg` (outside this folder) | the web app's tab icon and loading image |
 
-App ID: `ai.storyteller.effectcraft` (Wayland app ID, `packaging/linux/ai.storyteller.effectcraft.desktop`).
-
-## Regenerate
-
-After replacing `effectcraft.svg` / `effectcraft-small.svg`, run `packaging/icons.sh` (needs `resvg`; `iconutil`
-on macOS for the `.icns`). Copy `effectcraft-small.svg` to `apps/effectcraft-web/web/favicon.svg` too.
+File names and the app id `ai.storyteller.effectcraft` are unchanged (code and packaging depend on them).
+Licence: see [LICENSE.txt](LICENSE.txt). `packaging/icons.sh` still renders the derived files from `effectcraft.svg`.

@@ -1,8 +1,8 @@
 asset:        ai.storyteller.effectcraft.png
-title:        EffectCraft app icon, Linux hicolor 128x128
-author:       EffectCraft contributors (drawing by the project owner in ArtCraft)
-source:       original work
-license:      MIT OR Apache-2.0
+title:        Al Majlis Effects app icon, Linux hicolor 128x128
+author:       Al Majlis Studio (UAE Ministry of Energy and Infrastructure)
+source:       Al Majlis Studio icon, made for the Ministry with Higgsfield (Ideogram Vector), 2026-11-12
+license:      See assets/app-icon/LICENSE.txt (Al Majlis Studio icon)
 license-file: assets/app-icon/LICENSE.txt
-added:        2026-10-02 by EffectCraft contributors (Claude agent, app icon)
-notes:        Rendered from effectcraft.svg with resvg by packaging/icons.sh.
+added:        2026-11-12 by Claude (agent) for the Al Majlis Studio owner
+notes:        Owner-approved Al Majlis Studio icon; replaces the earlier EffectCraft unicorn artwork. Rendered from the approved icon's vector at this file's size and tile placement.
