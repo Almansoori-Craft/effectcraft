@@ -7,6 +7,11 @@ use craft_update::dialog::{CheckResultDialog, CheckResultResponse};
 #[cfg(not(target_arch = "wasm32"))]
 use craft_update::updater::{Action, Status, Updater};
 
+/// Majlis Studio: updates come only through Al Majlis (owner, 2026-11-12). Off: no check at start,
+/// none from a command, so the app never asks the upstream project's GitHub for releases. (No
+/// menu offers Check for Updates.)
+const UPSTREAM_CHECKS: bool = false;
+
 pub(crate) struct Runtime {
     #[cfg(not(target_arch = "wasm32"))]
     updater: Updater,
@@ -45,6 +50,9 @@ impl EffectcraftApp {
 }
 
 pub(crate) fn check(app: &mut EffectcraftApp) {
+    if !UPSTREAM_CHECKS {
+        return;
+    }
     #[cfg(not(target_arch = "wasm32"))]
     {
         app.updates_rt.check_requested = true;
@@ -60,6 +68,9 @@ pub(crate) fn check(app: &mut EffectcraftApp) {
 pub(crate) fn tick(app: &mut EffectcraftApp, ctx: &egui::Context) {
     #[cfg(not(target_arch = "wasm32"))]
     {
+        if !UPSTREAM_CHECKS {
+            return;
+        }
         let rt = &mut app.updates_rt;
         if std::mem::take(&mut rt.check_requested) {
             rt.updater.check_now(ctx);
@@ -123,5 +134,24 @@ pub(crate) fn show(app: &mut EffectcraftApp, ctx: &egui::Context) {
             app.updates_rt.manual_window_open = false;
             app.updates_rt.status_message = None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Majlis Studio (owner, 2026-11-12): neither the check at start nor the command asks
+    /// upstream for releases.
+    #[test]
+    fn upstream_update_checks_are_off() {
+        let mut app = EffectcraftApp::new(effectcraft_engine::Session::default());
+        #[cfg(not(target_arch = "wasm32"))]
+        app.set_startup_update_check(true);
+        check(&mut app);
+        tick(&mut app, &egui::Context::default());
+        assert!(!app.updates_rt.manual_window_open);
+        #[cfg(not(target_arch = "wasm32"))]
+        assert_eq!(app.updates_rt.updater.status(), &Status::Idle);
     }
 }
