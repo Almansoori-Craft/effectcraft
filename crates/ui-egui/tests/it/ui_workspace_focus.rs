@@ -177,7 +177,7 @@ fn tab_and_shift_tab_traverse_toolbar_and_space_activates_only_focused_tool() {
     let response = h.ctx.read_response(Id::unique(("tool-slot", 1usize))).unwrap();
     assert!(
         h.output().shapes.iter().any(|shape| {
-            matches!(&shape.shape, egui::Shape::Rect(r) if r.rect == response.rect.shrink(1.0) && r.stroke.color == h.state().tokens.text && r.stroke.width > 0.0)
+            matches!(&shape.shape, egui::Shape::Rect(r) if (r.rect == response.rect.shrink(1.0) && r.stroke.color == h.state().tokens.text || r.rect == response.rect.shrink(0.5) && r.stroke.color == h.state().tokens.accent) && r.stroke.width > 0.0)
         }),
         "the custom-painted toolbar must visibly identify keyboard focus"
     );

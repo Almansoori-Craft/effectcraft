@@ -10056,7 +10056,7 @@ mod tests {
             &[("text_button", 2), ("search_field", 3), ("text_field", 3), ("dropdown", 2), ("dropdown_tip", 2), ("text_fit", 3), ("check_label", 1)];
         /// Literals that draw as they are: a brand, a value, a separator, a unit, and the kerning
         /// sample pair the Character panel shows.
-        const VERBATIM: &[&str] = &["EffectCraft", "32", "dB", "···", "×", "V/A"];
+        const VERBATIM: &[&str] = &["EffectCraft", "Al Majlis Effects", "32", "dB", "···", "×", "V/A"];
 
         /// The top-level arguments of a call, given the text after its `(`. A call split over
         /// several lines is still one argument list, so this walks past newlines until the

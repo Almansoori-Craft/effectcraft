@@ -173,7 +173,8 @@ fn appearance_choices_validate_and_legacy_theme_still_selects() {
     assert_eq!(s.prefs.appearance.dark_theme, "dark");
     // A fixed mode mirrors its theme in the single-theme key for old readers.
     s.execute("prefs.set", json!({"key": "appearance.appearanceMode", "value": "light"})).unwrap();
-    assert_eq!(s.prefs.get("appearance.theme"), Some(json!("light")));
+    // Al Majlis: the default light theme is Al Majlis Light.
+    assert_eq!(s.prefs.get("appearance.theme"), Some(json!("majlisLight")));
     s.prefs.reset(Some("appearance")).unwrap();
     assert_eq!(s.prefs.appearance, crate::prefs::Appearance::default());
 }
